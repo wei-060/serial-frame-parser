@@ -1,0 +1,17 @@
+# 编译产物
+*.exe
+*.o
+*.obj
+*.a
+*.so
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.bak
+*.tmp
+
+# 系统
+Thumbs.db
+Desktop.ini
+.DS_Store
