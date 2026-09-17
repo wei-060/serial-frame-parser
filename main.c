@@ -63,7 +63,7 @@ static int test_parse_f1(void)
     int ok = parse_frame(F1, &f);
 
     if (!ok) {
-        printf("  [失败] F1 解析      返回了 0，应该是合法帧\n");
+        printf("  [失败] F1 解析      parse_frame 返回了 0，但 F1 是合法帧，应返回 1\n");
         return 0;
     }
     if (f.addr != 0x01 || f.func != 0x03 || f.len != 2) {
@@ -76,7 +76,7 @@ static int test_parse_f1(void)
         return 0;
     }
     if (!f.crc_ok) {
-        printf("  [失败] F1 CRC       crc_ok=0，但这一帧的 CRC 是对的\n");
+        printf("  [失败] F1 CRC       crc_ok=0，但 F1 的 CRC 应当通过，应置 1\n");
         return 0;
     }
     printf("  [通过] F1 完整解析  地址=01 功能码=03 长度=2 数据=00 0A CRC=OK\n");
@@ -89,7 +89,7 @@ static int test_parse_f2(void)
     int ok = parse_frame(F2, &f);
 
     if (!ok) {
-        printf("  [失败] F2 解析      返回了 0，应该是合法帧\n");
+        printf("  [失败] F2 解析      parse_frame 返回了 0，但 F2 是合法帧，应返回 1\n");
         return 0;
     }
     if (f.addr != 0x02 || f.func != 0x06 || f.len != 4) {
@@ -103,7 +103,7 @@ static int test_parse_f2(void)
         return 0;
     }
     if (!f.crc_ok) {
-        printf("  [失败] F2 CRC       crc_ok=0，但这一帧的 CRC 是对的\n");
+        printf("  [失败] F2 CRC       crc_ok=0，但 F2 的 CRC 应当通过，应置 1\n");
         return 0;
     }
     printf("  [通过] F2 完整解析  地址=02 功能码=06 长度=4 数据=12 34 56 78 CRC=OK\n");
