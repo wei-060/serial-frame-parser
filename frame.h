@@ -31,12 +31,12 @@ typedef struct {
 
 /* 解析一个「完整的帧」
  *
- * 前提：传入的 frame 必须指向一个完整帧（长度由调用者保证）。
+ * 前提：传入的 frame 指向一个完整帧（长度由调用者保证）。
  * 返回：1 = 帧结构完整（CRC 是否正确看 out->crc_ok）
  *       0 = 帧头不是 AA 55，根本不是一帧
  *
- * 注意 CRC 错时也返回 1 —— 因为「数据被篡改」和「压根不是一帧」
- * 是两件不同的事，调用者需要区分处理。
+ * CRC 错时仍返回 1：「数据被篡改」与「压根不是一帧」属于两种不同情形，
+ * 调用者据此区分处理。
  */
 int parse_frame(const uint8_t *frame, Frame *out);
 
@@ -48,7 +48,7 @@ int parse_frame(const uint8_t *frame, Frame *out);
  *   out, max    : 结果存放处，最多装 max 帧
  *   consumed    : 【输出】扫描到的位置。
  *                 consumed 之前的字节已处理完，可安全丢弃；
- *                 consumed 之后的字节必须保留（可能是没收完的半帧）。
+ *                 consumed 之后的字节需保留（可能是没收完的半帧）。
  * 返回：成功提取的帧数
  */
 int extract_frames(const uint8_t *stream, uint16_t len,

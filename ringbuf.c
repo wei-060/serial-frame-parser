@@ -9,7 +9,7 @@ void rxbuf_init(RxBuf *rb)
 void rxbuf_feed(RxBuf *rb, uint8_t b)
 {
     if (rb->len >= RXBUF_SIZE) {
-        rb->overflow++;         /* 满了就丢，但记一笔，方便定位问题 */
+        rb->overflow++;         /* 已满：该字节丢弃，同时累加计数以便定位问题 */
         return;
     }
     rb->buf[rb->len] = b;
@@ -21,12 +21,12 @@ int rxbuf_take_frames(RxBuf *rb, Frame *out, int max)
     uint16_t consumed = 0;
     uint16_t n, i;
 
-    /* extract_frames 通过 consumed 告知「处理到哪个位置了」 */
+    /* extract_frames 经 consumed 返回本次扫描到的位置 */
     n = extract_frames(rb->buf, rb->len, out, max, &consumed);
 
-    /* 消费：把已处理的 consumed 个字节移出缓冲区，剩余整体前移。
-     * 不做这一步，缓冲区会一直涨，最后灌满；
-     * 而且每次都会重复扫描已经处理过的老字节。 */
+    /* 消费：将已处理的 consumed 个字节移出，剩余字节整体前移。
+     * 不做这一步则缓冲区只增不减，最终填满；
+     * 且每次调用都会重复扫描此前已处理过的字节。 */
     if (consumed > 0) {
         for (i = 0; i < (uint16_t)(rb->len - consumed); i++) {
             rb->buf[i] = rb->buf[consumed + i];

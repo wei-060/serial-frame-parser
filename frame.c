@@ -5,19 +5,18 @@
  * 内部辅助
  * ------------------------------------------------------------ */
 
-/* 计算一帧「应该有」的 CRC 值
- * 范围：从 frame[2]（地址）开始，共 3 + N 个字节
- *       （地址 1 + 功能码 1 + 长度 1 + 数据 N）
- *       不含帧头，也不含 CRC 自己。
+/* 帧内 CRC 字段的计算范围：frame[2] 起，共 3 + N 字节
+ *   地址 1 + 功能码 1 + 长度 1 + 数据 N
+ * 不含帧头，也不含 CRC 本身。
  */
 static uint16_t frame_crc_calc(const uint8_t *frame)
 {
     return crc16_modbus(frame + 2, (uint16_t)(3 + frame[4]));
 }
 
-/* 取出帧里「实际存的」CRC 值
- * 存放顺序是低字节在前，所以要写成 frame[p] | (frame[p+1] << 8)。
- * 写反成 (frame[p] << 8) | frame[p+1] 会全错。
+/* 帧内 CRC 字段的存放位置：frame[5 + N] 起，2 字节，低字节在前
+ * 所以拼装方式是 frame[p] | (frame[p+1] << 8)。
+ * 若改成 (frame[p] << 8) | frame[p+1]，拼出来的字节序相反，无法与计算值相等。
  */
 static uint16_t frame_crc_stored(const uint8_t *frame)
 {
@@ -35,7 +34,7 @@ int parse_frame(const uint8_t *frame, Frame *out)
     uint16_t i, got, stored;
 
     if (frame[0] != 0xAA || frame[1] != 0x55) {
-        return 0;                       /* 帧头不对，不是一帧 */
+        return 0;                       /* 帧头不符，不是一帧 */
     }
 
     out->addr = frame[2];
@@ -58,13 +57,13 @@ int parse_frame(const uint8_t *frame, Frame *out)
  * 分帧
  * ------------------------------------------------------------ */
 
-/* 从 stream[start] 开始找帧头 AA 55
- * 返回 AA 所在的下标；找到末尾都没找到则返回 len。
+/* 从 stream[start] 起查找帧头 AA 55
+ * 返回 AA 所在下标；一直找到末尾仍未出现则返回 len。
  *
- * 关键：不能"看到 AA 就返回"，必须确认下一位是 55。
- * 这样自然就处理了 AA AA 55 的情况：
- *   位置 0 的 AA，下一位是 AA（不是 55）→ 不匹配，继续
- *   位置 1 的 AA，下一位是 55            → 匹配，返回 1
+ * 判据是「连续两字节」，而非单个 AA。
+ * 因此 AA AA 55 这种序列会跳过第一个 AA：
+ *   下标 0 处：stream[0]==AA 但 stream[1]!=55 → 不成立
+ *   下标 1 处：stream[1]==AA 且 stream[2]==55 → 返回 1
  */
 static uint16_t find_head(const uint8_t *stream, uint16_t len, uint16_t start)
 {
@@ -91,11 +90,11 @@ int extract_frames(const uint8_t *stream, uint16_t len,
         pos = find_head(stream, len, p);
 
         if (pos == len) {
-            /* 找不到了。但若流末尾是一个孤立的 0xAA，它可能是下一帧帧头的
-             * 前半（配对的 0x55 还没到），这个字节必须保留，
-             * 否则那一帧永远拼不出来。
-             *
-             * 这就是「流式处理」和「一次性处理整段」的语义差别。 */
+            /* 已无候选帧头，返回。consumed 的取值分两种：
+             *   末尾恰为孤立 0xAA → 它可能是下一帧帧头的前半个字节，
+             *                       配对的 0x55 尚未到达，故保留该字节
+             *   其余情况         → 全部字节处理完毕
+             * 这是流式处理与一次性处理整段字节流的区别所在。 */
             if (len > 0 && stream[len - 1] == 0xAA) {
                 *consumed = (uint16_t)(len - 1);
             } else {
@@ -104,7 +103,7 @@ int extract_frames(const uint8_t *stream, uint16_t len,
             return count;
         }
 
-        /* ② 先确认长度字段读得到，再读它（否则越界读别人的内存） */
+        /* ② 长度字段位于 stream[pos+4]，先确认可读（否则越界读到缓冲区之外） */
         if (pos + 5 > len) {
             *consumed = pos;
             return count;
@@ -112,27 +111,27 @@ int extract_frames(const uint8_t *stream, uint16_t len,
 
         need = (uint16_t)(7 + stream[pos + 4]);
 
-        /* 帧体还没收全 → 断包，停在这里等 */
+        /* 帧体未收全，即断包：停在帧头处，等后续字节补齐 */
         if (pos + need > len) {
             *consumed = pos;
             return count;
         }
 
-        /* 结果数组装不下了 */
+        /* 结果数组已满 */
         if (count >= max) {
             *consumed = pos;
             return count;
         }
 
-        /* ③ 帧头只是候选，CRC 才是判决 */
+        /* ③ 帧头是候选，CRC 结果才是判决依据 */
         if (parse_frame(stream + pos, &f) && f.crc_ok) {
             out[count] = f;
             count++;
-            p = (uint16_t)(pos + need);     /* 真帧：跳过整帧 */
+            p = (uint16_t)(pos + need);     /* 真帧：整帧跳过 */
         } else {
-            p = (uint16_t)(pos + 1);        /* 假帧头：只前进 1 格重新找 */
-            /* 注意：这里绝不能写成 pos + need ——
-             * 假帧头后面的"长度字段"是垃圾值，按它跳会吞掉后面的真帧。 */
+            p = (uint16_t)(pos + 1);        /* 假帧头：前进 1 格重新查找 */
+            /* 此处不能用 pos + need：假帧头后面的"长度字段"是数据段或噪声里的
+             * 任意字节，按它跳会越过后面的真帧。 */
         }
     }
 }
