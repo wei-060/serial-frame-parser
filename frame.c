@@ -91,7 +91,16 @@ int extract_frames(const uint8_t *stream, uint16_t len,
         pos = find_head(stream, len, p);
 
         if (pos == len) {
-            *consumed = len;    /* 全部扫描完毕，都可以丢弃 */
+            /* 找不到了。但若流末尾是一个孤立的 0xAA，它可能是下一帧帧头的
+             * 前半（配对的 0x55 还没到），这个字节必须保留，
+             * 否则那一帧永远拼不出来。
+             *
+             * 这就是「流式处理」和「一次性处理整段」的语义差别。 */
+            if (len > 0 && stream[len - 1] == 0xAA) {
+                *consumed = (uint16_t)(len - 1);
+            } else {
+                *consumed = len;
+            }
             return count;
         }
 
