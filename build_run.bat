@@ -1,13 +1,20 @@
 @echo off
 setlocal
-chcp 65001 >nul
+
+rem ---------------------------------------------------------------
+rem NOTE: this file MUST be saved as ANSI/GBK, NOT UTF-8.
+rem cmd.exe parses .bat files using the system ANSI codepage and
+rem ignores chcp, so UTF-8 Chinese here would break the script.
+rem ---------------------------------------------------------------
+
+chcp 936 >nul
 cd /d "%~dp0"
 
 set "GCC=C:\Dev-Cpp\bin\gcc.exe"
 
 if not exist "%GCC%" (
     echo.
-    echo [ERROR] ç¼–è¯‘å™¨æ²¡æ‰¾åˆ°: %GCC%
+    echo [´íÎó] ÕÒ²»µ½±àÒëÆ÷: %GCC%
     echo.
     pause
     exit /b 1
@@ -17,22 +24,27 @@ set "EXE=frame_parser.exe"
 
 echo.
 echo ==========================================
-echo   ç¼–è¯‘å…¨éƒ¨ .c æ–‡ä»¶
+echo   ±àÒëÈ«²¿ .c ÎÄ¼þ
 echo ==========================================
+
 "%GCC%" *.c -o "%EXE%" -std=c99
 if errorlevel 1 (
     echo.
-    echo [FAILED] æŠŠä¸Šé¢çš„é”™è¯¯æ”¹æŽ‰ï¼Œå†è¿è¡Œä¸€æ¬¡æœ¬æ–‡ä»¶ã€‚
+    echo [Ê§°Ü] ÉÏÃæµÄ´íÎó¸ÄµôÖ®ºó£¬ÔÙÔËÐÐÒ»´Î±¾ÎÄ¼þ¡£
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo [Build OK]  è¿è¡Œ %EXE%
+echo [±àÒë³É¹¦]  ÕýÔÚÔËÐÐ %EXE%
 echo ------------------------------------------
+
+chcp 65001 >nul
 "%EXE%"
+chcp 936 >nul
+
 echo ------------------------------------------
-echo [Program exited]
+echo [³ÌÐòÒÑÍË³ö]
 echo.
 pause
