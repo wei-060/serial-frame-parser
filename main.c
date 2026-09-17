@@ -1,7 +1,7 @@
 /* ============================================================
  * 串口数据帧解析器 —— 测试台
  *
- * 四个阶段的 23 个测试用例，全部自动比对，无需人工判读。
+ * 四个阶段的 24 个测试用例，全部自动比对，无需人工判读。
  * 直接运行即可看到结果。
  * ============================================================ */
 
@@ -53,8 +53,12 @@ static const uint8_t F3[] = {0xAA,0x55,0x10,0x04,0x04,0xAA,0x55,0x00,0xFF,0x8B,0
 /* CRC 被改坏的帧 */
 static const uint8_t F1_BAD[] = {0xAA,0x55,0x01,0x03,0x02,0x00,0x0A,0x00,0x00};
 
-/* 帧头不对 */
+/* 帧头不对：第 1 个字节就不对 */
 static const uint8_t F_BADHEAD[] = {0x12,0x34,0x01,0x03,0x02,0x00,0x0A,0x38,0x43};
+
+/* 帧头不对：第 1 个字节对、第 2 个字节错
+ * 专门抓 "只检查了 frame[0] == 0xAA，漏了 frame[1]" 这种漏检 */
+static const uint8_t F_BADHEAD2[] = {0xAA,0x99,0x01,0x03,0x02,0x00,0x0A,0x38,0x43};
 
 
 static int test_parse_f1(void)
@@ -137,6 +141,19 @@ static int test_bad_head(void)
         return 0;
     }
     printf("  [通过] 坏帧头被拒绝 返回 0（正确识别出不是一帧）\n");
+    return 1;
+}
+
+static int test_bad_head2(void)
+{
+    Frame f;
+    int ok = parse_frame(F_BADHEAD2, &f);
+
+    if (ok) {
+        printf("  [失败] 坏帧头2     返回了 1，但帧头是 AA 99（第 2 个字节错），应返回 0\n");
+        return 0;
+    }
+    printf("  [通过] 坏帧头2被拒  返回 0（首字节对、次字节错也能识别）\n");
     return 1;
 }
 
@@ -363,16 +380,17 @@ int main(void)
         p2 += test_parse_f2();
         p2 += test_crc_bad();
         p2 += test_bad_head();
+        p2 += test_bad_head2();
 
         printf("\n------------------------------------\n");
-        if (p2 == 4) {
-            printf("  第 2 步 4/4 通过\n");
+        if (p2 == 5) {
+            printf("  第 2 步 5/5 通过\n");
         } else {
-            printf("  第 2 步 %d/4 通过  ->  继续调\n", p2);
+            printf("  第 2 步 %d/5 通过  ->  继续调\n", p2);
         }
         printf("------------------------------------\n\n");
 
-        if (p2 != 4) {
+        if (p2 != 5) {
             printf("  第 2 步没过，后续结果没有意义。\n\n");
             return 0;
         }
@@ -437,6 +455,6 @@ int main(void)
         printf("------------------------------------\n\n");
     }
 
-    printf("==== 全部 23 个用例通过 ====\n\n");
+    printf("==== 全部 24 个用例通过 ====\n\n");
     return 0;
 }
